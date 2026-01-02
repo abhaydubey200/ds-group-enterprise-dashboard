@@ -1,123 +1,114 @@
 import streamlit as st
-from streamlit_option_menu import option_menu
 from st_aggrid import AgGrid, GridOptionsBuilder
+import pandas as pd
+import numpy as np
+import mysql.connector
+from utils import clean_file, remove_duplicates, export_file
+from auth import login_user, is_authenticated
+from database import init_db, insert_data, fetch_data
+from streamlit_option_menu import option_menu
 import plotly.express as px
-from utils import read_file, clean_data, export_csv, export_excel
-from database import create_table, insert_data, fetch_tables, fetch_table_data, log_upload, fetch_logs, delete_table
-from auth import login, is_admin
 
+# -------------------- APP CONFIG --------------------
 st.set_page_config(
     page_title="DS Group Enterprise Dashboard",
-    page_icon="assets/ds_logo.png",
+    page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
+st.markdown(
+    """
+    <style>
+    .stApp { background-color: #ffffff; color: black; }
+    .css-1d391kg { color: black; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# -------------------- DS GROUP LOGO --------------------
+st.sidebar.image("assets/ds_logo.png", width=150)
+
+# -------------------- AUTHENTICATION --------------------
 if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
+    st.session_state.authenticated = False
 
-if not st.session_state["authenticated"]:
-    login()
-    st.stop()
+if not st.session_state.authenticated:
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        if login_user(username, password):
+            st.session_state.authenticated = True
+            st.experimental_rerun()
+        else:
+            st.sidebar.error("Invalid credentials!")
+else:
+    # -------------------- SIDEBAR MENU --------------------
+    with st.sidebar:
+        selected = option_menu(
+            menu_title="DS Group Dashboard",
+            options=["Home", "Upload Data", "View Data", "Analytics", "Logs"],
+            icons=["house", "cloud-upload", "table", "bar-chart-line", "file-earmark-text"],
+            menu_icon="grid",
+            default_index=0,
+        )
 
-st.sidebar.image("assets/ds_logo.png", width=160)
-st.sidebar.markdown("## DS Group Dashboard")
-st.sidebar.markdown(f"#### Role: **{st.session_state.get('role').capitalize()}**")
+    # -------------------- PAGE: HOME --------------------
+    if selected == "Home":
+        st.title("📊 DS Group Enterprise Dashboard")
+        st.markdown("Welcome to the DS Group interactive admin dashboard.")
+        st.markdown("Use the menu to upload, view, and analyze data.")
 
-menu_items = ["Upload Data", "View Tables", "Analytics", "Logs"]
-if is_admin():
-    menu_items.append("Delete Table")
+    # -------------------- PAGE: UPLOAD DATA --------------------
+    elif selected == "Upload Data":
+        st.header("📁 Upload CSV / Excel / JSON")
+        uploaded_file = st.file_uploader(
+            "Choose a file", type=["csv", "xlsx", "json"]
+        )
+        if uploaded_file is not None:
+            df = clean_file(uploaded_file)
+            df = remove_duplicates(df)
+            st.success("✅ File cleaned and duplicates removed!")
+            st.dataframe(df.head())
 
-menu = option_menu(
-    menu_title="DS Group Menu",
-    options=menu_items,
-    icons=["cloud-upload", "table", "bar-chart", "clock-history", "trash"],
-    menu_icon="cast",
-    default_index=0,
-    styles={"container": {"padding": "10px"},
-            "icon": {"color": "#2E7D32", "font-size": "18px"},
-            "nav-link": {"font-size": "16px", "text-align": "left"},
-            "nav-link-selected": {"background-color": "#2E7D32", "color": "white"}}
-)
+            if st.button("Save to Database"):
+                insert_data(df)
+                st.success("💾 Data saved to MySQL database!")
 
-# -------- Upload Data --------
-if menu == "Upload Data":
-    if not is_admin():
-        st.warning("Admin access required")
-        st.stop()
-    st.header("📤 Upload CSV / Excel / JSON Files")
-    uploaded_files = st.file_uploader("Choose files", accept_multiple_files=True, type=["csv","xlsx","xls","json"])
-    if uploaded_files:
-        for file in uploaded_files:
-            st.subheader(f"Processing file: {file.name}")
-            df = read_file(file)
-            if df is None:
-                st.error("Unsupported file format")
-                continue
-            df, dup = clean_data(df)
-            st.success(f"✅ {dup} duplicates removed")
-            table_name = st.text_input("Table Name", value=file.name.split(".")[0])
-            if st.button(f"Upload {file.name}"):
-                create_table(table_name, df)
-                insert_data(table_name, df)
-                log_upload(file.name, table_name, len(df), dup)
-                st.balloons()
-                st.success(f"File `{file.name}` uploaded successfully!")
+    # -------------------- PAGE: VIEW DATA --------------------
+    elif selected == "View Data":
+        st.header("🗃 View Database Tables")
+        data = fetch_data()
+        if not data.empty:
+            gb = GridOptionsBuilder.from_dataframe(data)
+            gb.configure_pagination()
+            gb.configure_side_bar()
+            grid_options = gb.build()
+            AgGrid(data, gridOptions=grid_options)
+        else:
+            st.info("No data available in the database.")
 
-# -------- View Tables --------
-elif menu == "View Tables":
-    st.header("📋 View & Export Tables")
-    tables = fetch_tables()
-    if tables:
-        table = st.selectbox("Select Table", tables)
-        if table:
-            df = fetch_table_data(table)
-            gb = GridOptionsBuilder.from_dataframe(df)
-            gb.configure_pagination(enabled=True)
-            gb.configure_default_column(sortable=True, filter=True, editable=False, resizable=True)
-            AgGrid(df, gridOptions=gb.build(), height=400, fit_columns_on_grid_load=True)
-            st.subheader("⬇ Export Options")
-            col1, col2 = st.columns(2)
-            col1.download_button("Download CSV", export_csv(df), file_name=f"{table}.csv")
-            col2.download_button("Download Excel", export_excel(df), file_name=f"{table}.xlsx")
-    else:
-        st.info("No tables available. Upload data first.")
+    # -------------------- PAGE: ANALYTICS --------------------
+    elif selected == "Analytics":
+        st.header("📈 Analytics")
+        data = fetch_data()
+        if not data.empty:
+            numeric_cols = data.select_dtypes(include=np.number).columns.tolist()
+            if numeric_cols:
+                selected_col = st.selectbox("Select column for visualization", numeric_cols)
+                fig = px.histogram(data, x=selected_col)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("No numeric columns found for visualization.")
+        else:
+            st.info("No data to visualize.")
 
-# -------- Analytics --------
-elif menu == "Analytics":
-    st.header("📊 Upload Analytics")
-    logs = fetch_logs()
-    if not logs.empty:
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Uploads 🟢", logs.shape[0])
-        col2.metric("Total Rows 📦", logs["rows_uploaded"].sum())
-        col3.metric("Duplicates Removed ❌", logs["duplicates_removed"].sum())
-        st.subheader("Uploads Over Time")
-        fig = px.bar(logs, x="uploaded_at", y="rows_uploaded", color="table_name", text="rows_uploaded")
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No upload logs to display.")
-
-# -------- Logs --------
-elif menu == "Logs":
-    st.header("📜 Upload History Logs")
-    logs = fetch_logs()
-    if not logs.empty:
-        gb = GridOptionsBuilder.from_dataframe(logs)
-        gb.configure_pagination(enabled=True)
-        gb.configure_default_column(sortable=True, filter=True, resizable=True)
-        AgGrid(logs, gridOptions=gb.build(), height=450)
-    else:
-        st.info("No logs available.")
-
-# -------- Delete Table --------
-elif menu == "Delete Table" and is_admin():
-    st.header("🗑️ Delete Tables (Admin Only)")
-    tables = fetch_tables()
-    if tables:
-        table = st.selectbox("Select Table to Delete", tables)
-        if st.button("Delete Permanently (Backup Created)"):
-            backup_name = delete_table(table)
-            st.success(f"Table `{table}` backed up as `{backup_name}` and deleted successfully!")
-    else:
-        st.info("No tables available to delete.")
+    # -------------------- PAGE: LOGS --------------------
+    elif selected == "Logs":
+        st.header("📝 Upload & System Logs")
+        logs_df = fetch_data(table_name="upload_logs")
+        if not logs_df.empty:
+            st.dataframe(logs_df)
+        else:
+            st.info("No logs available yet.")
