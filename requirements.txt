@@ -1,0 +1,10 @@
+streamlit
+pandas
+numpy
+mysql-connector-python
+openpyxl
+st-aggrid
+plotly
+streamlit-option-menu
+bcrypt
+xlsxwriter
