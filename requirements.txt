@@ -1,11 +1,13 @@
+# Streamlit dashboard
 streamlit==1.30.0
-mysql-connector-python
-pandas
-numpy
-matplotlib
-plotly
-# st-aggrid removed to prevent errors on Python 3.13
-rich
-markdown-it-py
-mdurl
-pygments
+
+# MySQL connector
+mysql-connector-python==8.1.0
+
+# Data handling
+pandas==2.1.1
+openpyxl==3.1.2  # for reading Excel files
+xlrd==2.0.1      # for older Excel formats if needed
+
+# Optional: for better visuals
+matplotlib==3.8.0
