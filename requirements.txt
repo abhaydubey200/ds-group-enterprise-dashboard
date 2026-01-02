@@ -1,22 +1,9 @@
 streamlit==1.30.0
-rich==13.3.4              # compatible with Streamlit 1.30.0
-markdown-it-py==2.2.0      # compatible with rich 13.3.4
+rich>=10.14.0,<14
+markdown-it-py>=2.2.0,<3
 mdurl==0.1.2
-pygments==2.19.2
-
-# AgGrid compatible version
-st-aggrid==0.7.6           # last known compatible with Python 3.13
-
-# Data processing
-pandas==2.0.3
-numpy==1.26.4
-openpyxl==3.1.2
-xlsxwriter==3.1.2
-mysql-connector-python==8.1.0
-
-# Security
-bcrypt==4.0.1
-
-# Visualization
-plotly==5.18.0
-streamlit-option-menu==0.4.2
+pygments>=2.13.0,<3
+st-aggrid>=0.8.0   # pick the latest available compatible version
+pandas==2.0.3      # stable version compatible with Streamlit Cloud
+numpy>=1.25.0
+mysql-connector-python>=8.0.33
