@@ -1,3 +1,4 @@
+# Streamlit Dashboard Dependencies
 streamlit==1.30.0
 pandas==2.1.1
 numpy==1.27.0
@@ -8,6 +9,9 @@ plotly==5.18.0
 streamlit-option-menu==0.4.2
 bcrypt==4.0.1
 xlsxwriter==3.1.2
+
+# Rich / Markdown compatibility
 rich==14.2.0
 markdown-it-py==4.0.0
 mdurl==0.1.2
+pygments==2.19.2
