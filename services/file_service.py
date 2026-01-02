@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def load_file(file):
     if file.name.endswith(".csv"):
         return pd.read_csv(file)
@@ -7,4 +8,4 @@ def load_file(file):
         return pd.read_excel(file)
     if file.name.endswith(".json"):
         return pd.read_json(file)
-    raise ValueError("Unsupported file type")
+    raise ValueError("Unsupported file format")
