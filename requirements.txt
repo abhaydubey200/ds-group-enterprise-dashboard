@@ -1,7 +1,11 @@
 streamlit==1.30.0
-st-aggrid   # leave version blank so pip picks a compatible one
-rich        # leave version blank
+mysql-connector-python
+pandas
+numpy
+matplotlib
+plotly
+# st-aggrid removed to prevent errors on Python 3.13
+rich
 markdown-it-py
 mdurl
 pygments
-mysql-connector-python
