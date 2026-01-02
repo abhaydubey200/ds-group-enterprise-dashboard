@@ -1,15 +1,19 @@
-import hashlib
+from core.database import execute_query
+from datetime import datetime
 
-USERS = {
-    "admin": {"password": "admin123", "role": "ADMIN"},
-    "user": {"password": "user123", "role": "USER"},
-}
+def log_action(user, action, table, record_id=None, details=None):
+    query = """
+        INSERT INTO AUDIT_LOG
+        (USERNAME, ROLE, ACTION, TABLE_NAME, RECORD_ID, DETAILS, TIMESTAMP)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """
+    execute_query(query, (
+        user["username"],
+        user["role"],
+        action,
+        table,
+        record_id,
+        details,
+        datetime.utcnow()
+    ))
 
-
-def authenticate(username, password):
-    user = USERS.get(username)
-    if not user:
-        return None
-    if password == user["password"]:
-        return {"username": username, "role": user["role"]}
-    return None
