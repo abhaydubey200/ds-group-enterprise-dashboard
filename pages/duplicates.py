@@ -1,20 +1,15 @@
 import streamlit as st
-import pandas as pd
 from services.duplicate_service import find_duplicates, merge_duplicates
 
-st.title("🔁 Duplicate Detection")
+st.title("🔁 Duplicate Manager")
 
-uploaded = st.file_uploader("Upload file")
+col = st.text_input("Duplicate Check Column")
+if col:
+    dups = find_duplicates("OUTLET_MASTER", col)
+    st.dataframe(dups)
 
-if uploaded:
-    df = pd.read_csv(uploaded)
-    cols = st.multiselect("Duplicate 기준 columns", df.columns)
+    val = st.text_input("Value to merge")
+    if st.button("Merge"):
+        merge_duplicates(st.session_state.user, "OUTLET_MASTER", col, val)
+        st.success("Merged")
 
-    if cols:
-        dup = find_duplicates(df, cols)
-        st.dataframe(dup)
-
-        if st.button("Merge & Remove Duplicates"):
-            clean = merge_duplicates(df, cols)
-            st.success("Merged")
-            st.dataframe(clean)
