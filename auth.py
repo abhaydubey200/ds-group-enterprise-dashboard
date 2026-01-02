@@ -1,25 +1,14 @@
-import streamlit as st
 import bcrypt
-from database import get_connection
 
-def login():
-    st.title("🟢 DS Group Admin Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+# Simple admin user (can extend to DB-backed)
+USERS = {
+    "admin": bcrypt.hashpw("admin123".encode(), bcrypt.gensalt())
+}
 
-    if st.button("Login"):
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT password, role FROM users WHERE username=%s", (username,))
-        row = cur.fetchone()
-        conn.close()
+def login_user(username, password):
+    if username in USERS:
+        return bcrypt.checkpw(password.encode(), USERS[username])
+    return False
 
-        if row and bcrypt.checkpw(password.encode(), row[0].encode()):
-            st.session_state["authenticated"] = True
-            st.session_state["role"] = row[1]
-            st.experimental_rerun()
-        else:
-            st.error("Invalid credentials")
-
-def is_admin():
-    return st.session_state.get("role") == "admin"
+def is_authenticated():
+    return "authenticated" in st.session_state and st.session_state.authenticated
