@@ -1,9 +1,21 @@
 ROLE_PERMISSIONS = {
-    "ADMIN": {"read", "insert", "update", "delete", "merge"},
-    "MANAGER": {"read", "insert", "update"},
-    "USER": {"read"},
+    "ADMIN": {
+        "tables": ["OUTLET_MASTER"],
+        "actions": ["CREATE", "READ", "UPDATE", "DELETE", "MERGE"]
+    },
+    "MANAGER": {
+        "tables": ["OUTLET_MASTER"],
+        "actions": ["READ", "UPDATE"]
+    },
+    "VIEWER": {
+        "tables": ["OUTLET_MASTER"],
+        "actions": ["READ"]
+    }
 }
 
+def can_access(user, table, action):
+    return (
+        table in ROLE_PERMISSIONS[user["role"]]["tables"]
+        and action in ROLE_PERMISSIONS[user["role"]]["actions"]
+    )
 
-def has_permission(role, action):
-    return action in ROLE_PERMISSIONS.get(role, set())
