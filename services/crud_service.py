@@ -1,49 +1,22 @@
-import pandas as pd
-from core.database import get_connection
-from services.audit_service import log_action
+from core.database import execute_query, fetch_df
+from core.audit import log_action
 
+def fetch_table(table):
+    return fetch_df(f"SELECT * FROM {table}")
 
-def insert_row(table, row, user):
-    conn = get_connection()
-    cur = conn.cursor()
+def insert_row(user, table, data):
+    cols = ",".join(data.keys())
+    vals = ",".join(["%s"] * len(data))
+    query = f"INSERT INTO {table} ({cols}) VALUES ({vals})"
+    execute_query(query, tuple(data.values()))
+    log_action(user, "CREATE", table, details=str(data))
 
-    cols = ",".join(row.keys())
-    vals = ",".join(["%s"] * len(row))
-    cur.execute(f"INSERT INTO {table} ({cols}) VALUES ({vals})", list(row.values()))
+def update_row(user, table, pk, updates):
+    sets = ",".join([f"{k}=%s" for k in updates])
+    query = f"UPDATE {table} SET {sets} WHERE ID=%s"
+    execute_query(query, (*updates.values(), pk))
+    log_action(user, "UPDATE", table, pk, str(updates))
 
-    conn.commit()
-    log_action(table, "INSERT", user, str(row))
-    cur.close()
-    conn.close()
-
-
-def update_row(table, row, pk_col, pk_val, user):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    sets = ",".join([f"{k}=%s" for k in row])
-    cur.execute(
-        f"UPDATE {table} SET {sets} WHERE {pk_col}=%s",
-        list(row.values()) + [pk_val],
-    )
-
-    conn.commit()
-    log_action(table, "UPDATE", user, f"{pk_col}={pk_val}")
-    cur.close()
-    conn.close()
-
-
-def delete_rows(table, pk_col, values, user):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    placeholders = ",".join(["%s"] * len(values))
-    cur.execute(
-        f"DELETE FROM {table} WHERE {pk_col} IN ({placeholders})",
-        values,
-    )
-
-    conn.commit()
-    log_action(table, "DELETE", user, f"{values}")
-    cur.close()
-    conn.close()
+def delete_row(user, table, pk):
+    execute_query(f"DELETE FROM {table} WHERE ID=%s", (pk,))
+    log_action(user, "DELETE", table, pk)
