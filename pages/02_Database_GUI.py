@@ -1,56 +1,29 @@
 import streamlit as st
-import pandas as pd
-from core.database import get_connection
-from core.permissions import has_permission
-from services.crud_service import insert_row, update_row, delete_rows
+from services.crud_service import fetch_table, update_row, delete_row
+from core.permissions import can_access
 
+TABLE = "OUTLET_MASTER"
 user = st.session_state.user
-role = user["role"]
 
-st.title("🗃️ DS Group Database GUI")
+st.title("🗃️ Database GUI")
 
-table = st.text_input("Table name")
-
-if not table:
-    st.stop()
-
-conn = get_connection()
-df = pd.read_sql(f"SELECT * FROM {table} LIMIT 500", conn)
+df = fetch_table(TABLE)
 st.dataframe(df, use_container_width=True)
 
-pk_col = df.columns[0]  # assumed primary key
+if can_access(user, TABLE, "UPDATE"):
+    st.subheader("✏️ Edit Row")
+    row_id = st.number_input("Row ID", step=1)
+    column = st.selectbox("Column", df.columns)
+    value = st.text_input("New Value")
 
-# ---------- INSERT ----------
-if has_permission(role, "insert"):
-    st.subheader("➕ Insert Row")
-    with st.form("insert"):
-        row = {col: st.text_input(col) for col in df.columns}
-        if st.form_submit_button("Insert"):
-            insert_row(table, row, user["username"])
-            st.success("Inserted")
-            st.rerun()
+    if st.button("Update"):
+        update_row(user, TABLE, row_id, {column: value})
+        st.success("Updated")
 
-# ---------- UPDATE ----------
-if has_permission(role, "update"):
-    st.subheader("✏️ Update Row")
-    pk = st.selectbox("Select Row", df[pk_col])
-    selected = df[df[pk_col] == pk].iloc[0]
-
-    with st.form("update"):
-        updated = {
-            col: st.text_input(col, str(selected[col]))
-            for col in df.columns
-        }
-        if st.form_submit_button("Update"):
-            update_row(table, updated, pk_col, pk, user["username"])
-            st.success("Updated")
-            st.rerun()
-
-# ---------- BULK DELETE ----------
-if has_permission(role, "delete"):
-    st.subheader("❌ Bulk Delete")
-    ids = st.multiselect("Select rows", df[pk_col])
-    if st.button("Delete Selected"):
-        delete_rows(table, pk_col, ids, user["username"])
+if can_access(user, TABLE, "DELETE"):
+    st.subheader("🗑️ Delete Row")
+    del_id = st.number_input("Delete ID", step=1)
+    if st.button("Delete"):
+        delete_row(user, TABLE, del_id)
         st.success("Deleted")
-        st.rerun()
+
