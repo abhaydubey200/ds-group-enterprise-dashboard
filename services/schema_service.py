@@ -1,23 +1,51 @@
-from core.database import run_query
+from services.snowflake_service import get_connection
 
-def get_table_columns(table_name):
-    query = f"""
+
+def get_table_schema(table_name: str):
+    """
+    Fetch column names from Snowflake table
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        query = f"""
         SELECT COLUMN_NAME
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_NAME = '{table_name.upper()}'
         ORDER BY ORDINAL_POSITION
+        """
+        cursor.execute(query)
+        return [row[0] for row in cursor.fetchall()]
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def compare_schema(df, table_name: str):
     """
-    return [row[0] for row in run_query(query)]
+    Compare uploaded DataFrame schema with Snowflake table schema
+    """
 
-def compare_schema(df, table_name):
-    table_cols = get_table_columns(table_name)
-    file_cols = list(df.columns)
+    try:
+        table_columns = get_table_schema(table_name)
+    except Exception:
+        return {
+            "match": False,
+            "error": f"Table `{table_name}` does not exist",
+            "missing": [],
+            "extra": list(df.columns)
+        }
 
-    missing = set(table_cols) - set(file_cols)
-    extra = set(file_cols) - set(table_cols)
+    df_columns = [col.upper() for col in df.columns]
+    table_columns = [col.upper() for col in table_columns]
+
+    missing = sorted(set(table_columns) - set(df_columns))
+    extra = sorted(set(df_columns) - set(table_columns))
 
     return {
         "match": len(missing) == 0 and len(extra) == 0,
-        "missing": list(missing),
-        "extra": list(extra),
+        "missing": missing,
+        "extra": extra
     }
