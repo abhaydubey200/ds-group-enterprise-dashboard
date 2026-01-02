@@ -2,31 +2,41 @@ import pandas as pd
 from services.snowflake_service import get_connection
 
 
-def upload_df(df: pd.DataFrame, table_name: str):
+def upload_df(df: pd.DataFrame, table_name: str, chunk_size: int = 500):
     """
-    Upload DataFrame to Snowflake table safely
+    Upload DataFrame to Snowflake table safely using executemany
     """
 
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-        # Normalize column names
-        df.columns = [c.upper().replace(" ", "_").replace("/", "_") for c in df.columns]
+        # Normalize column names to match Snowflake table
+        df = df.copy()
+        df.columns = [
+            col.upper()
+            .replace(" ", "_")
+            .replace("/", "_")
+            .replace("-", "_")
+            for col in df.columns
+        ]
 
-        # Build INSERT query dynamically
-        columns = ", ".join(df.columns)
-        placeholders = ", ".join(["%s"] * len(df.columns))
+        # Replace NaN with None (Snowflake compatible)
+        df = df.where(pd.notnull(df), None)
+
+        columns = ",".join(df.columns)
+        placeholders = ",".join(["%s"] * len(df.columns))
 
         insert_sql = f"""
         INSERT INTO {table_name} ({columns})
         VALUES ({placeholders})
         """
 
-        # Convert NaN → None (Snowflake compatible)
-        records = df.where(pd.notnull(df), None).values.tolist()
+        # Upload in chunks (production safe)
+        for i in range(0, len(df), chunk_size):
+            chunk = df.iloc[i:i + chunk_size]
+            cursor.executemany(insert_sql, chunk.values.tolist())
 
-        cursor.executemany(insert_sql, records)
         conn.commit()
 
     except Exception as e:
